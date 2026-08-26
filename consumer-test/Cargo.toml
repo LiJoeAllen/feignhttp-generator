@@ -5,18 +5,18 @@ edition = "2021"
 publish = false
 
 [dependencies]
-feignhttp = { path = "../../feignhttp", features = ["reqwest-client", "reqwest-json", "reqwest-multipart"] }
+feignhttp = { git = "https://github.com/LiJoeAllen/feignhttp", branch = "dev", features = ["reqwest-client", "reqwest-json", "reqwest-multipart"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 [build-dependencies]
-feignhttp-generator = { path = ".." }
+feignhttp-generator = { git = "https://github.com/LiJoeAllen/feignhttp-generator", branch = "master" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 
 [package.metadata.feignhttp-generator]
-spec = "../sample_openapi.json"
+spec = "https://raw.githubusercontent.com/LiJoeAllen/feignhttp-generator/master/consumer-test/specs/sample_openapi.json"
 layout = "module"
 out = "feign_api.rs"
 generate = true
