@@ -16,7 +16,7 @@ feignhttp-generator = { git = "https://github.com/LiJoeAllen/feignhttp-generator
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 
 [package.metadata.feignhttp-generator]
-spec = "https://raw.githubusercontent.com/LiJoeAllen/feignhttp-generator/master/consumer-test/specs/sample_openapi.json"
+spec = "https://petstore3.swagger.io/api/v3/openapi.json"
 layout = "module"
 out = "feign_api.rs"
 generate = true
