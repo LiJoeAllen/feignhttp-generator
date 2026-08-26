@@ -101,6 +101,14 @@ impl Ctx<'_> {
         match v.get("type").and_then(Value::as_str) {
             Some(t) => self.convert_typed(Some(t), v),
             None => {
+                if let Some(branches) = v.get("allOf").and_then(Value::as_array) {
+                    return self.convert_all_of(branches, v);
+                }
+                for key in ["oneOf", "anyOf"] {
+                    if let Some(branches) = v.get(key).and_then(Value::as_array) {
+                        return self.convert_one_of(branches);
+                    }
+                }
                 if v.get("properties").is_some() || v.get("additionalProperties").is_some() {
                     self.convert_object(v)
                 } else if v.get("items").is_some() {
@@ -114,6 +122,63 @@ impl Ctx<'_> {
                 }
             }
         }
+    }
+
+    /// Resolve a composition branch to its object shape, following `$ref`.
+    fn branch_object(&mut self, branch: &Value) -> Option<ObjectSchema> {
+        match self.convert(branch) {
+            Schema::Object(o) => Some(o),
+            Schema::Ref(name) => match self.schemas.get(&name) {
+                Some(Schema::Object(o)) => Some(o.clone()),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// `allOf`: merge every object branch into one struct. Later branches
+    /// win on field conflicts; sibling `properties`/`required` are honored.
+    fn convert_all_of(&mut self, branches: &[Value], sibling: &Value) -> Schema {
+        let mut merged: Vec<Field> = Vec::new();
+        for b in branches {
+            if let Some(o) = self.branch_object(b) {
+                for f in o.fields {
+                    if !merged.iter().any(|e| e.wire_name == f.wire_name) {
+                        merged.push(f);
+                    }
+                }
+            } else {
+                let ptr = b.get("$ref").and_then(Value::as_str).unwrap_or("<inline>");
+                self.warn(format!("allOf branch `{ptr}` is not an object; skipped"));
+            }
+        }
+        // Sibling keywords alongside allOf (rare but legal).
+        if sibling.get("properties").is_some() || sibling.get("required").is_some() {
+            if let Schema::Object(o) = self.convert_object(sibling) {
+                for f in o.fields {
+                    if !merged.iter().any(|e| e.wire_name == f.wire_name) {
+                        merged.push(f);
+                    }
+                }
+            }
+        }
+        Schema::Object(ObjectSchema { fields: merged })
+    }
+
+    /// `oneOf` / `anyOf`: pick the first non-null branch (the common
+    /// `[$ref, {"type":"null"}]` nullable-envelope idiom).
+    fn convert_one_of(&mut self, branches: &[Value]) -> Schema {
+        let non_null: Vec<&Value> = branches
+            .iter()
+            .filter(|b| b.get("type").and_then(Value::as_str) != Some("null"))
+            .collect();
+        if non_null.is_empty() {
+            return Schema::Any;
+        }
+        if branches.len() > 1 && non_null.len() > 1 {
+            self.warn("composition with multiple non-null branches narrowed to the first");
+        }
+        self.convert(non_null[0])
     }
 
     fn convert_typed(&mut self, type_str: Option<&str>, v: &Value) -> Schema {

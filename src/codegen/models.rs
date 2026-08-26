@@ -75,7 +75,7 @@ impl ModelRegistry {
                         &id,
                         format!(
                             "#[derive(Clone, Debug, ::serde::Deserialize, ::serde::Serialize)]\n\
-                             #[serde(transparent)]\npub struct {id}(pub serde_json::Value);"
+                             #[serde(transparent)]\npub struct {id}(pub serde_json::Value);\n"
                         ),
                     );
                     self.serde_json_value = true;
@@ -149,7 +149,7 @@ impl ModelRegistry {
                     },
                     raw,
                 );
-                self.put(&id, format!("pub type {id} = {ty};"));
+                self.put(&id, format!("pub type {id} = {ty};\n"));
             }
         }
     }
@@ -194,7 +194,7 @@ impl ModelRegistry {
             } else {
                 ty
             };
-            if clean != f.wire_name {
+            if field_ident != f.wire_name {
                 let _ = writeln!(
                     out,
                     "    #[serde(rename = \"{}\")]",

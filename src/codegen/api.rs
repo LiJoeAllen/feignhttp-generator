@@ -110,6 +110,15 @@ pub fn generate(spec: &crate::ir::ApiSpec, mapped: &[MappedOperation]) -> Codege
     for (path, indices) in &groups {
         let first = &mapped[indices[0]];
         let trait_name = first.trait_name.clone();
+
+        // Emit methods first so the import list can reflect what is actually used.
+        let mut methods = String::new();
+        for &i in indices {
+            emit_method(&mut reg, &mut methods, &mapped[i]);
+        }
+        let needs_multipart =
+            methods.contains("#[part(") || methods.contains("#[file(");
+
         let mut content = String::new();
 
         // Inner attributes must precede everything else in the file/module.
@@ -118,9 +127,6 @@ pub fn generate(spec: &crate::ir::ApiSpec, mapped: &[MappedOperation]) -> Codege
 
         // Method attribute macros are consumed by the `#[feign]` expansion;
         // only `feign`, the builder trait and (optionally) multipart are needed.
-        let needs_multipart = indices
-            .iter()
-            .any(|&i| payload_kind(&mapped[i]) == PayloadKind::Multipart);
         if needs_multipart {
             let _ = writeln!(
                 content,
@@ -141,9 +147,7 @@ pub fn generate(spec: &crate::ir::ApiSpec, mapped: &[MappedOperation]) -> Codege
         let _ = writeln!(content, "#[feign(url = \"{{base_url}}{{prefix}}\")]");
         let _ = writeln!(content, "pub trait {trait_name} {{");
 
-        for &i in indices {
-            emit_method(&mut reg, &mut content, &mapped[i]);
-        }
+        content.push_str(&methods);
 
         let _ = writeln!(content, "}}");
         api_files.push(ApiFile {
