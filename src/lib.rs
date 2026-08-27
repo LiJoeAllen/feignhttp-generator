@@ -102,7 +102,8 @@ pub fn load_spec(source: &str) -> Result<Vec<u8>> {
         let body = ureq::get(source)
             .call()
             .with_context(|| format!("cannot fetch spec {source}"))?
-            .into_string()
+            .body_mut()
+            .read_to_string()
             .with_context(|| format!("cannot read response body of {source}"))?;
         Ok(body.into_bytes())
     } else {
