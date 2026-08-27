@@ -195,11 +195,7 @@ impl ModelRegistry {
                 ty
             };
             if field_ident != f.wire_name {
-                let _ = writeln!(
-                    out,
-                    "    #[serde(rename = \"{}\")]",
-                    escape(&f.wire_name)
-                );
+                let _ = writeln!(out, "    #[serde(rename = \"{}\")]", escape(&f.wire_name));
             }
             let _ = writeln!(out, "    pub {field_ident}: {ty},");
         }

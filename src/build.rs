@@ -38,14 +38,13 @@ fn try_run() -> Result<()> {
         return Ok(());
     }
 
-    let manifest_dir = PathBuf::from(
-        std::env::var("CARGO_MANIFEST_DIR").context("CARGO_MANIFEST_DIR not set")?,
-    );
+    let manifest_dir =
+        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").context("CARGO_MANIFEST_DIR not set")?);
     let manifest_path = manifest_dir.join("Cargo.toml");
     let raw = std::fs::read_to_string(&manifest_path)
         .with_context(|| format!("cannot read {}", manifest_path.display()))?;
-    let parsed: toml::Value =
-        toml::from_str(&raw).with_context(|| format!("cannot parse {}", manifest_path.display()))?;
+    let parsed: toml::Value = toml::from_str(&raw)
+        .with_context(|| format!("cannot parse {}", manifest_path.display()))?;
 
     let Some(cfg) = parsed
         .get("package")
@@ -56,7 +55,10 @@ fn try_run() -> Result<()> {
         return Ok(());
     };
 
-    let generate = cfg.get("generate").and_then(toml::Value::as_bool).unwrap_or(true);
+    let generate = cfg
+        .get("generate")
+        .and_then(toml::Value::as_bool)
+        .unwrap_or(true);
     if !generate {
         println!("cargo:warning=feignhttp-generator: generate = false, skipping");
         return Ok(());
@@ -72,10 +74,7 @@ fn try_run() -> Result<()> {
     let spec_src = if is_remote {
         spec_cfg.clone()
     } else {
-        manifest_dir
-            .join(&spec_cfg)
-            .display()
-            .to_string()
+        manifest_dir.join(&spec_cfg).display().to_string()
     };
     if !is_remote {
         println!("cargo:rerun-if-changed={}", spec_src);
@@ -124,10 +123,7 @@ fn try_run() -> Result<()> {
             if up_to_date(&hash_file, &hash) && out_file.exists() {
                 return Ok(());
             }
-            let files = crate::generate_from_reader(
-                std::io::Cursor::new(spec_bytes),
-                &options,
-            )?;
+            let files = crate::generate_from_reader(std::io::Cursor::new(spec_bytes), &options)?;
             for (_, content) in &files {
                 std::fs::write(&out_file, content)
                     .with_context(|| format!("cannot write {}", out_file.display()))?;
@@ -149,5 +145,7 @@ fn try_run() -> Result<()> {
 }
 
 fn up_to_date(hash_file: &Path, current: &str) -> bool {
-    std::fs::read_to_string(hash_file).map(|h| h == current).unwrap_or(false)
+    std::fs::read_to_string(hash_file)
+        .map(|h| h == current)
+        .unwrap_or(false)
 }

@@ -20,9 +20,11 @@ pub fn parse_reader(mut reader: impl std::io::Read) -> Result<Value> {
 /// Normalize any supported OpenAPI dialect (2.0 / 3.0.x / 3.1.x) into the internal IR.
 /// Returns the normalized spec plus non-fatal warnings.
 pub fn normalize(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
-    if root.get("openapi").and_then(Value::as_str).is_some_and(|v| {
-        v.split('.').next().is_some_and(|major| major == "3")
-    }) {
+    if root
+        .get("openapi")
+        .and_then(Value::as_str)
+        .is_some_and(|v| v.split('.').next().is_some_and(|major| major == "3"))
+    {
         normalize_v3(root)
     } else if root
         .get("swagger")
@@ -193,8 +195,12 @@ impl Ctx<'_> {
                     enum_values: enum_strings(v),
                 })
             }
-            Some("integer") => Schema::Integer(v.get("format").and_then(Value::as_str).map(String::from)),
-            Some("number") => Schema::Number(v.get("format").and_then(Value::as_str).map(String::from)),
+            Some("integer") => {
+                Schema::Integer(v.get("format").and_then(Value::as_str).map(String::from))
+            }
+            Some("number") => {
+                Schema::Number(v.get("format").and_then(Value::as_str).map(String::from))
+            }
             Some("boolean") => Schema::Boolean,
             Some(other) => {
                 self.warn(format!("unknown schema type `{other}` treated as opaque"));
@@ -223,7 +229,10 @@ impl Ctx<'_> {
                         nullable,
                     },
                     required,
-                    description: pv.get("description").and_then(Value::as_str).map(String::from),
+                    description: pv
+                        .get("description")
+                        .and_then(Value::as_str)
+                        .map(String::from),
                 });
             }
         }
@@ -236,7 +245,9 @@ impl Ctx<'_> {
             .and_then(|i| i.get("nullable"))
             .and_then(Value::as_bool)
             .unwrap_or(false);
-        let items_owned = items_val.cloned().unwrap_or(Value::Object(Default::default()));
+        let items_owned = items_val
+            .cloned()
+            .unwrap_or(Value::Object(Default::default()));
         let elem = self.convert(&items_owned);
         Schema::Array(Box::new(TypeExpr {
             schema: elem,
@@ -376,7 +387,10 @@ fn normalize_v3(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
             operations.push(Operation {
                 method,
                 path: path.clone(),
-                operation_id: op.get("operationId").and_then(Value::as_str).map(String::from),
+                operation_id: op
+                    .get("operationId")
+                    .and_then(Value::as_str)
+                    .map(String::from),
                 summary: op.get("summary").and_then(Value::as_str).map(String::from),
                 parameters,
                 request_body,
@@ -412,7 +426,10 @@ fn normalize_v2(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
         .unwrap_or("0.0.0")
         .to_string();
 
-    let host = root.get("host").and_then(Value::as_str).unwrap_or("localhost");
+    let host = root
+        .get("host")
+        .and_then(Value::as_str)
+        .unwrap_or("localhost");
     let scheme = root
         .get("schemes")
         .and_then(Value::as_array)
@@ -488,8 +505,7 @@ fn normalize_v2(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
                                 .and_then(Value::as_str)
                                 .unwrap_or("field")
                                 .to_string();
-                            let is_file =
-                                p.get("type").and_then(Value::as_str) == Some("file");
+                            let is_file = p.get("type").and_then(Value::as_str) == Some("file");
                             let schema = if is_file {
                                 has_file = true;
                                 Schema::Binary
@@ -528,7 +544,12 @@ fn normalize_v2(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
                     "application/x-www-form-urlencoded"
                 };
                 Some(RequestBody {
-                    content: vec![(media.into(), Schema::Object(ObjectSchema { fields: form_fields }))],
+                    content: vec![(
+                        media.into(),
+                        Schema::Object(ObjectSchema {
+                            fields: form_fields,
+                        }),
+                    )],
                 })
             } else {
                 None
@@ -537,7 +558,10 @@ fn normalize_v2(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
             operations.push(Operation {
                 method,
                 path: path.clone(),
-                operation_id: op.get("operationId").and_then(Value::as_str).map(String::from),
+                operation_id: op
+                    .get("operationId")
+                    .and_then(Value::as_str)
+                    .map(String::from),
                 summary: op.get("summary").and_then(Value::as_str).map(String::from),
                 parameters,
                 request_body,
@@ -648,7 +672,10 @@ fn param_from_obj(p: &Value, ctx: &mut Ctx) -> Result<Parameter> {
             .and_then(Value::as_bool)
             .unwrap_or(matches!(location, Location::Path)),
         schema,
-        description: p.get("description").and_then(Value::as_str).map(String::from),
+        description: p
+            .get("description")
+            .and_then(Value::as_str)
+            .map(String::from),
     })
 }
 
@@ -676,7 +703,10 @@ fn pick_media_v3(resp: &Value, ctx: &mut Ctx) -> Option<SuccessResponse> {
     let keys: Vec<&String> = content.keys().collect();
     let entry = prefer_media(keys.into_iter())?;
     let mv = content.get(entry)?;
-    let schema = mv.get("schema").map(|s| ctx.convert(s)).unwrap_or(Schema::Any);
+    let schema = mv
+        .get("schema")
+        .map(|s| ctx.convert(s))
+        .unwrap_or(Schema::Any);
     Some(SuccessResponse {
         media_type: entry.clone(),
         schema,

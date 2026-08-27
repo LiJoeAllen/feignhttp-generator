@@ -78,8 +78,7 @@ pub fn generate_from_reader(
     for w in &warnings {
         eprintln!("warning: {w}");
     }
-    let mapped =
-        mapper::map_operations(spec.operations.clone()).map_err(anyhow::Error::msg)?;
+    let mapped = mapper::map_operations(spec.operations.clone()).map_err(anyhow::Error::msg)?;
     let out = codegen::api::generate(&spec, &mapped);
 
     match options.layout {
@@ -246,13 +245,18 @@ fn insert_file(root: &mut Node, path: &[String], content: &str) {
     let mut cur = root;
     for seg in path[..path.len() - 1].iter() {
         let next = match cur {
-            Node::Dir(map) => map.entry(seg.clone()).or_insert_with(|| Node::Dir(BTreeMap::new())),
+            Node::Dir(map) => map
+                .entry(seg.clone())
+                .or_insert_with(|| Node::Dir(BTreeMap::new())),
             Node::File(_) => unreachable!("file cannot contain children"),
         };
         cur = next;
     }
     if let Node::Dir(map) = cur {
-        map.insert(path[path.len() - 1].clone(), Node::File(content.to_string()));
+        map.insert(
+            path[path.len() - 1].clone(),
+            Node::File(content.to_string()),
+        );
     }
 }
 
@@ -279,7 +283,11 @@ fn render_nodes(node: Node, level: usize) -> String {
 }
 
 /// Render the standalone crate tree for `Layout::Crate`.
-fn render_crate_tree(options: &Options, spec: &crate::ir::ApiSpec, out: &CodegenOutput) -> Vec<(PathBuf, String)> {
+fn render_crate_tree(
+    options: &Options,
+    spec: &crate::ir::ApiSpec,
+    out: &CodegenOutput,
+) -> Vec<(PathBuf, String)> {
     let features = out.emission.cargo_features().join(", ");
     let feign_dep = match &options.feignhttp_dep {
         FeignDep::Version(v) => format!("version = \"{v}\""),

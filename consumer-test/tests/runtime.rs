@@ -12,7 +12,9 @@ use std::sync::Arc;
 use consumer_test::models::{
     ApiResponse, Category, Order, OrderStatus, Pet, PetFindByStatusQuery, PetStatus, Tag, User,
 };
-use consumer_test::{index::Index, pet::Pet as PetApi, store::Store, user::User as UserApi, ApiContext};
+use consumer_test::{
+    index::Index, pet::Pet as PetApi, store::Store, user::User as UserApi, ApiContext,
+};
 use feignhttp::FeignClientBuilder;
 
 /// What the stub server captured from one request.
@@ -52,7 +54,9 @@ fn spawn_server(handler: Handler) -> String {
 }
 
 fn handle_conn(stream: TcpStream, handler: Handler) {
-    let Ok(write_half) = stream.try_clone() else { return };
+    let Ok(write_half) = stream.try_clone() else {
+        return;
+    };
     let mut reader = BufReader::new(stream);
     let mut write_half = write_half;
 
@@ -168,7 +172,10 @@ async fn get_pet_decodes_nested_models_and_enum() {
     assert_eq!(pet.name, "Rex");
     let category = pet.category.expect("category");
     assert_eq!(category.name.as_deref(), Some("Dogs"));
-    assert_eq!(pet.photo_urls, vec!["https://example.com/rex.png".to_string()]);
+    assert_eq!(
+        pet.photo_urls,
+        vec!["https://example.com/rex.png".to_string()]
+    );
     assert!(matches!(pet.status, Some(PetStatus::Available)));
 }
 
@@ -222,7 +229,10 @@ async fn put_pet_roundtrip() {
         .build()
         .expect("build Index");
     let pet = Pet {
-        category: Some(Category { id: Some(1), name: Some("Dogs".to_string()) }),
+        category: Some(Category {
+            id: Some(1),
+            name: Some("Dogs".to_string()),
+        }),
         id: Some(42),
         name: "Rex".to_string(),
         photo_urls: vec![],
@@ -238,7 +248,11 @@ async fn delete_pet_sends_header_and_returns_unit() {
     let base = spawn_server(Arc::new(|req| {
         assert_eq!(req.method, "DELETE");
         assert_eq!(req.path, "/pet/42");
-        assert_eq!(req.header("api_key"), Some("secret-key"), "header param missing");
+        assert_eq!(
+            req.header("api_key"),
+            Some("secret-key"),
+            "header param missing"
+        );
         empty_response(200)
     }));
     let client = Index::builder()
@@ -261,7 +275,10 @@ async fn find_by_status_sends_enum_query_and_decodes_vec() {
             "enum query not serialized correctly: {}",
             req.query
         );
-        json_response(200, serde_json::json!([sample_pet_json(1), sample_pet_json(2)]))
+        json_response(
+            200,
+            serde_json::json!([sample_pet_json(1), sample_pet_json(2)]),
+        )
     }));
     let client = PetApi::builder()
         .context(client_ctx(&base))
@@ -379,7 +396,10 @@ async fn create_with_list_posts_json_array_body() {
         user_status: Some(1),
         username: None,
     }];
-    let created = client.create_with_list(users).await.expect("createWithList");
+    let created = client
+        .create_with_list(users)
+        .await
+        .expect("createWithList");
     assert_eq!(created.id, Some(9));
 }
 

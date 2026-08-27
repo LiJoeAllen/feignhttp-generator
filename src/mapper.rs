@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::ir::{Operation};
+use crate::ir::Operation;
 use crate::naming::{sanitize_ident, sanitize_mod_name, sanitize_type_name};
 
 /// An operation after applying the path-to-module mapping rules.
@@ -26,7 +26,11 @@ impl MappedOperation {
 
     /// Raw doc line describing where this operation came from.
     pub fn origin(&self) -> String {
-        format!("{} {}", self.op.method.as_str().to_uppercase(), self.op.path)
+        format!(
+            "{} {}",
+            self.op.method.as_str().to_uppercase(),
+            self.op.path
+        )
     }
 }
 

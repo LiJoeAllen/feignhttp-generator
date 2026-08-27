@@ -2,9 +2,9 @@
 const RAW_OK: [&str; 47] = [
     "as", "break", "const", "continue", "else", "enum", "false", "fn", "for", "if", "impl", "in",
     "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return", "static", "struct",
-    "trait", "true", "type", "unsafe", "use", "where", "while", "async", "await", "dyn", "abstract",
-    "become", "box", "do", "final", "macro", "override", "priv", "typeof", "unsized", "virtual",
-    "yield", "try", "gen",
+    "trait", "true", "type", "unsafe", "use", "where", "while", "async", "await", "dyn",
+    "abstract", "become", "box", "do", "final", "macro", "override", "priv", "typeof", "unsized",
+    "virtual", "yield", "try", "gen",
 ];
 
 /// Keywords that cannot be raw identifiers.
@@ -21,7 +21,8 @@ pub fn to_snake_case(s: &str) -> String {
                     && (chars[i - 1].is_ascii_lowercase()
                         || (chars[i - 1].is_ascii_digit() && c.is_ascii_alphabetic()));
                 let next_lower = i + 1 < chars.len() && chars[i + 1].is_ascii_lowercase();
-                if i > 0 && (prev_lower_or_digit || (chars[i - 1].is_ascii_uppercase() && next_lower))
+                if i > 0
+                    && (prev_lower_or_digit || (chars[i - 1].is_ascii_uppercase() && next_lower))
                 {
                     out.push('_');
                 }

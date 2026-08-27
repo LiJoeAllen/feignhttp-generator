@@ -116,8 +116,7 @@ pub fn generate(spec: &crate::ir::ApiSpec, mapped: &[MappedOperation]) -> Codege
         for &i in indices {
             emit_method(&mut reg, &mut methods, &mapped[i]);
         }
-        let needs_multipart =
-            methods.contains("#[part(") || methods.contains("#[file(");
+        let needs_multipart = methods.contains("#[part(") || methods.contains("#[file(");
 
         let mut content = String::new();
 
@@ -157,7 +156,9 @@ pub fn generate(spec: &crate::ir::ApiSpec, mapped: &[MappedOperation]) -> Codege
     }
 
     // Feature requirements.
-    emission.multipart = mapped.iter().any(|m| payload_kind(m) == PayloadKind::Multipart);
+    emission.multipart = mapped
+        .iter()
+        .any(|m| payload_kind(m) == PayloadKind::Multipart);
     emission.json = mapped.iter().any(returns_json);
     emission.serde_json_value = reg.serde_json_value;
 
