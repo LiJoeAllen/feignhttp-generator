@@ -18,6 +18,7 @@ mod mapper;
 mod naming;
 mod openapi;
 
+use crate::naming::escape;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -59,20 +60,13 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Self {
-        Self {
-            package_name: "generated-api".to_string(),
-            layout: Layout::Module,
-            feignhttp_dep: FeignDep::default(),
-        }
+        Self { package_name: "generated-api".to_string(), layout: Layout::Module, feignhttp_dep: FeignDep::default() }
     }
 }
 
 /// Parse and normalize a spec, then render bindings. Returns
 /// `(relative paths, contents)` without touching the filesystem.
-pub fn generate_from_reader(
-    reader: impl std::io::Read,
-    options: &Options,
-) -> Result<Vec<(PathBuf, String)>> {
+pub fn generate_from_reader(reader: impl std::io::Read, options: &Options) -> Result<Vec<(PathBuf, String)>> {
     let root = openapi::parse_reader(reader)?;
     let (spec, warnings) = openapi::normalize(&root)?;
     for w in &warnings {
@@ -82,10 +76,7 @@ pub fn generate_from_reader(
     let out = codegen::api::generate(&spec, &mapped);
 
     match options.layout {
-        Layout::Module => Ok(vec![(
-            PathBuf::from("feign_api.rs"),
-            render_module_file(&spec, &out),
-        )]),
+        Layout::Module => Ok(vec![(PathBuf::from("feign_api.rs"), render_module_file(&spec, &out))]),
         Layout::Crate => Ok(render_crate_tree(options, &spec, &out)),
     }
 }
@@ -98,13 +89,9 @@ pub fn generate_from_str(spec: &str, options: &Options) -> Result<Vec<(PathBuf, 
 /// Load spec bytes from a local path or an `http(s)://` URL.
 pub fn load_spec(source: &str) -> Result<Vec<u8>> {
     if source.starts_with("http://") || source.starts_with("https://") {
-        let body = ureq::get(source)
-            .call()
-            .with_context(|| format!("cannot fetch spec {source}"))?
-            .into_body()
-            .into_reader();
-        let body = std::io::read_to_string(body)
-            .with_context(|| format!("cannot read response body of {source}"))?;
+        let body =
+            ureq::get(source).call().with_context(|| format!("cannot fetch spec {source}"))?.into_body().into_reader();
+        let body = std::io::read_to_string(body).with_context(|| format!("cannot read response body of {source}"))?;
         Ok(body.into_bytes())
     } else {
         std::fs::read(source).with_context(|| format!("cannot open spec {source}"))
@@ -113,11 +100,7 @@ pub fn load_spec(source: &str) -> Result<Vec<u8>> {
 
 /// Like [`generate`], but `spec_source` may be a local path or an
 /// `http(s)://` URL.
-pub fn generate_from_source(
-    spec_source: &str,
-    out_root: impl AsRef<Path>,
-    options: &Options,
-) -> Result<()> {
+pub fn generate_from_source(spec_source: &str, out_root: impl AsRef<Path>, options: &Options) -> Result<()> {
     let bytes = load_spec(spec_source)?;
     let files = generate_from_reader(std::io::Cursor::new(bytes), options)?;
 
@@ -128,11 +111,8 @@ pub fn generate_from_source(
             if let Some(parent) = out_root.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            let (_, content) = files
-                .first()
-                .context("module layout produced no output file")?;
-            std::fs::write(out_root, content)
-                .with_context(|| format!("cannot write {}", out_root.display()))?;
+            let (_, content) = files.first().context("module layout produced no output file")?;
+            std::fs::write(out_root, content).with_context(|| format!("cannot write {}", out_root.display()))?;
         }
         Layout::Crate => {
             std::fs::create_dir_all(out_root)?;
@@ -141,8 +121,7 @@ pub fn generate_from_source(
                 if let Some(parent) = target.parent() {
                     std::fs::create_dir_all(parent)?;
                 }
-                std::fs::write(&target, content)
-                    .with_context(|| format!("cannot write {}", target.display()))?;
+                std::fs::write(&target, content).with_context(|| format!("cannot write {}", target.display()))?;
             }
         }
     }
@@ -177,14 +156,10 @@ fn context_src(spec: &crate::ir::ApiSpec) -> String {
     if let Some(base) = &spec.base_url {
         s.push_str(&format!(
             "\n\nimpl Default for ApiContext {{\n    fn default() -> Self {{\n        Self::new(\"{base}\", \"{}\")\n    }}\n}}",
-            escape_str(&spec.prefix)
+            escape(&spec.prefix)
         ));
     }
     s
-}
-
-fn escape_str(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 fn header_docs(spec_title: &str, spec_version: &str) -> String {
@@ -202,15 +177,7 @@ fn header_docs(spec_title: &str, spec_version: &str) -> String {
 
 fn indent_block(src: &str, level: usize) -> String {
     let pad = "    ".repeat(level);
-    src.lines()
-        .map(|l| {
-            if l.trim().is_empty() {
-                String::from("\n")
-            } else {
-                format!("{pad}{l}\n")
-            }
-        })
-        .collect()
+    src.lines().map(|l| if l.trim().is_empty() { String::from("\n") } else { format!("{pad}{l}\n") }).collect()
 }
 
 /// Render the whole module-layout binding file (nested mods, single include).
@@ -245,18 +212,13 @@ fn insert_file(root: &mut Node, path: &[String], content: &str) {
     let mut cur = root;
     for seg in path[..path.len() - 1].iter() {
         let next = match cur {
-            Node::Dir(map) => map
-                .entry(seg.clone())
-                .or_insert_with(|| Node::Dir(BTreeMap::new())),
+            Node::Dir(map) => map.entry(seg.clone()).or_insert_with(|| Node::Dir(BTreeMap::new())),
             Node::File(_) => unreachable!("file cannot contain children"),
         };
         cur = next;
     }
     if let Node::Dir(map) = cur {
-        map.insert(
-            path[path.len() - 1].clone(),
-            Node::File(content.to_string()),
-        );
+        map.insert(path[path.len() - 1].clone(), Node::File(content.to_string()));
     }
 }
 
@@ -283,11 +245,7 @@ fn render_nodes(node: Node, level: usize) -> String {
 }
 
 /// Render the standalone crate tree for `Layout::Crate`.
-fn render_crate_tree(
-    options: &Options,
-    spec: &crate::ir::ApiSpec,
-    out: &CodegenOutput,
-) -> Vec<(PathBuf, String)> {
+fn render_crate_tree(options: &Options, spec: &crate::ir::ApiSpec, out: &CodegenOutput) -> Vec<(PathBuf, String)> {
     let features = out.emission.cargo_features().join(", ");
     let feign_dep = match &options.feignhttp_dep {
         FeignDep::Version(v) => format!("version = \"{v}\""),
@@ -354,13 +312,8 @@ fn insert_node(tree: &mut BTreeMap<String, Node2>, path: &[String]) {
     let mut cur = tree;
     for (i, seg) in path.iter().enumerate() {
         let last = i + 1 == path.len();
-        let entry = cur.entry(seg.clone()).or_insert_with(|| {
-            if last {
-                Node2::Leaf
-            } else {
-                Node2::Dir(BTreeMap::new())
-            }
-        });
+        let entry =
+            cur.entry(seg.clone()).or_insert_with(|| if last { Node2::Leaf } else { Node2::Dir(BTreeMap::new()) });
         match entry {
             Node2::Dir(map) => {
                 cur = map;

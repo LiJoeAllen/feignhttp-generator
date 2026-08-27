@@ -26,11 +26,7 @@ pub fn normalize(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
         .is_some_and(|v| v.split('.').next().is_some_and(|major| major == "3"))
     {
         normalize_v3(root)
-    } else if root
-        .get("swagger")
-        .and_then(Value::as_str)
-        .is_some_and(|v| v.starts_with('2'))
-    {
+    } else if root.get("swagger").and_then(Value::as_str).is_some_and(|v| v.starts_with('2')) {
         normalize_v2(root)
     } else {
         bail!("unsupported spec: neither `openapi` (3.x) nor `swagger` (2.0) version field found")
@@ -70,11 +66,7 @@ impl Ctx<'_> {
                         Value::Null
                     }
                 };
-                let converted = if target.is_null() {
-                    Schema::Any
-                } else {
-                    self.convert_inner(&target)
-                };
+                let converted = if target.is_null() { Schema::Any } else { self.convert_inner(&target) };
                 self.schemas.insert(name.clone(), converted);
             }
             Schema::Ref(name)
@@ -86,16 +78,9 @@ impl Ctx<'_> {
     fn convert_inner(&mut self, v: &Value) -> Schema {
         // OAS 3.1: `type` may be an array, e.g. ["string", "null"].
         if let Some(types) = v.get("type").and_then(Value::as_array) {
-            let non_null: Vec<&str> = types
-                .iter()
-                .filter_map(Value::as_str)
-                .filter(|t| *t != "null")
-                .collect();
+            let non_null: Vec<&str> = types.iter().filter_map(Value::as_str).filter(|t| *t != "null").collect();
             if non_null.len() > 1 {
-                self.warn(format!(
-                    "multi-type schema {non_null:?} narrowed to `{}`",
-                    non_null[0]
-                ));
+                self.warn(format!("multi-type schema {non_null:?} narrowed to `{}`", non_null[0]));
             }
             return self.convert_typed(non_null.first().copied(), v);
         }
@@ -116,9 +101,7 @@ impl Ctx<'_> {
                 } else if v.get("items").is_some() {
                     self.convert_array(v)
                 } else if let Some(vals) = enum_strings(v) {
-                    Schema::Str(StrSchema {
-                        enum_values: Some(vals),
-                    })
+                    Schema::Str(StrSchema { enum_values: Some(vals) })
                 } else {
                     Schema::Any
                 }
@@ -170,10 +153,8 @@ impl Ctx<'_> {
     /// `oneOf` / `anyOf`: pick the first non-null branch (the common
     /// `[$ref, {"type":"null"}]` nullable-envelope idiom).
     fn convert_one_of(&mut self, branches: &[Value]) -> Schema {
-        let non_null: Vec<&Value> = branches
-            .iter()
-            .filter(|b| b.get("type").and_then(Value::as_str) != Some("null"))
-            .collect();
+        let non_null: Vec<&Value> =
+            branches.iter().filter(|b| b.get("type").and_then(Value::as_str) != Some("null")).collect();
         if non_null.is_empty() {
             return Schema::Any;
         }
@@ -191,16 +172,10 @@ impl Ctx<'_> {
                 if v.get("format").and_then(Value::as_str) == Some("binary") {
                     return Schema::Binary;
                 }
-                Schema::Str(StrSchema {
-                    enum_values: enum_strings(v),
-                })
+                Schema::Str(StrSchema { enum_values: enum_strings(v) })
             }
-            Some("integer") => {
-                Schema::Integer(v.get("format").and_then(Value::as_str).map(String::from))
-            }
-            Some("number") => {
-                Schema::Number(v.get("format").and_then(Value::as_str).map(String::from))
-            }
+            Some("integer") => Schema::Integer(v.get("format").and_then(Value::as_str).map(String::from)),
+            Some("number") => Schema::Number(v.get("format").and_then(Value::as_str).map(String::from)),
             Some("boolean") => Schema::Boolean,
             Some(other) => {
                 self.warn(format!("unknown schema type `{other}` treated as opaque"));
@@ -224,15 +199,9 @@ impl Ctx<'_> {
                 let nullable = pv.get("nullable").and_then(Value::as_bool).unwrap_or(false);
                 fields.push(Field {
                     wire_name: wire.clone(),
-                    type_: TypeExpr {
-                        schema: self.convert(pv),
-                        nullable,
-                    },
+                    type_: TypeExpr { schema: self.convert(pv), nullable },
                     required,
-                    description: pv
-                        .get("description")
-                        .and_then(Value::as_str)
-                        .map(String::from),
+                    description: pv.get("description").and_then(Value::as_str).map(String::from),
                 });
             }
         }
@@ -241,28 +210,16 @@ impl Ctx<'_> {
 
     fn convert_array(&mut self, v: &Value) -> Schema {
         let items_val = v.get("items");
-        let nullable = items_val
-            .and_then(|i| i.get("nullable"))
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
-        let items_owned = items_val
-            .cloned()
-            .unwrap_or(Value::Object(Default::default()));
+        let nullable = items_val.and_then(|i| i.get("nullable")).and_then(Value::as_bool).unwrap_or(false);
+        let items_owned = items_val.cloned().unwrap_or(Value::Object(Default::default()));
         let elem = self.convert(&items_owned);
-        Schema::Array(Box::new(TypeExpr {
-            schema: elem,
-            nullable,
-        }))
+        Schema::Array(Box::new(TypeExpr { schema: elem, nullable }))
     }
 }
 
 fn enum_strings(v: &Value) -> Option<Vec<String>> {
-    let vals: Vec<String> = v
-        .get("enum")
-        .and_then(Value::as_array)?
-        .iter()
-        .filter_map(|x| x.as_str().map(String::from))
-        .collect();
+    let vals: Vec<String> =
+        v.get("enum").and_then(Value::as_array)?.iter().filter_map(|x| x.as_str().map(String::from)).collect();
     (!vals.is_empty()).then_some(vals)
 }
 
@@ -274,9 +231,7 @@ fn resolve_ref<'a>(root: &'a Value, reference: &str) -> Result<&'a Value> {
     let mut cur = root;
     for raw in tokens.split('/') {
         let token = raw.replace("~1", "/").replace("~0", "~");
-        cur = cur
-            .get(&token)
-            .with_context(|| format!("unresolvable `$ref`: {reference}"))?;
+        cur = cur.get(&token).with_context(|| format!("unresolvable `$ref`: {reference}"))?;
     }
     Ok(cur)
 }
@@ -284,27 +239,16 @@ fn resolve_ref<'a>(root: &'a Value, reference: &str) -> Result<&'a Value> {
 /// HTTP method keys present on a path item.
 fn keys_of(item: &Value) -> Vec<String> {
     item.as_object()
-        .map(|o| {
-            o.keys()
-                .filter(|k| HttpMethod::from_str(k).is_some())
-                .cloned()
-                .collect()
-        })
+        .map(|o| o.keys().filter(|k| HttpMethod::from_str(k).is_some()).cloned().collect())
         .unwrap_or_default()
 }
 
 /// Convert an OAS3 `content` map into ordered (media type, schema) entries.
-fn content_entries(
-    content: &serde_json::Map<String, Value>,
-    ctx: &mut Ctx,
-) -> Vec<(String, Schema)> {
+fn content_entries(content: &serde_json::Map<String, Value>, ctx: &mut Ctx) -> Vec<(String, Schema)> {
     content
         .iter()
         .map(|(mt, mv)| {
-            let schema = mv
-                .get("schema")
-                .map(|s| ctx.convert(s))
-                .unwrap_or(Schema::Any);
+            let schema = mv.get("schema").map(|s| ctx.convert(s)).unwrap_or(Schema::Any);
             (mt.clone(), schema)
         })
         .collect()
@@ -312,16 +256,8 @@ fn content_entries(
 
 fn normalize_v3(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
     let info = root.get("info");
-    let title = info
-        .and_then(|i| i.get("title"))
-        .and_then(Value::as_str)
-        .unwrap_or("API")
-        .to_string();
-    let version = info
-        .and_then(|i| i.get("version"))
-        .and_then(Value::as_str)
-        .unwrap_or("0.0.0")
-        .to_string();
+    let title = info.and_then(|i| i.get("title")).and_then(Value::as_str).unwrap_or("API").to_string();
+    let version = info.and_then(|i| i.get("version")).and_then(Value::as_str).unwrap_or("0.0.0").to_string();
 
     let server_url = root
         .get("servers")
@@ -332,18 +268,10 @@ fn normalize_v3(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
         .unwrap_or("/");
     let (base_url, prefix) = split_server_url(server_url);
 
-    let mut ctx = Ctx {
-        root,
-        schemas: BTreeMap::new(),
-        warnings: Vec::new(),
-    };
+    let mut ctx = Ctx { root, schemas: BTreeMap::new(), warnings: Vec::new() };
 
     // Seed all named component schemas first so refs always resolve.
-    if let Some(schemas) = root
-        .get("components")
-        .and_then(|c| c.get("schemas"))
-        .and_then(Value::as_object)
-    {
+    if let Some(schemas) = root.get("components").and_then(|c| c.get("schemas")).and_then(Value::as_object) {
         for (name, v) in schemas {
             let converted = ctx.convert(v);
             match (&converted, ctx.schemas.contains_key(name)) {
@@ -359,10 +287,7 @@ fn normalize_v3(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
         }
     }
 
-    let paths = root
-        .get("paths")
-        .and_then(Value::as_object)
-        .ok_or_else(|| anyhow!("spec has no `paths` object"))?;
+    let paths = root.get("paths").and_then(Value::as_object).ok_or_else(|| anyhow!("spec has no `paths` object"))?;
 
     let mut operations = Vec::new();
     for (path, item) in paths {
@@ -380,18 +305,14 @@ fn normalize_v3(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
                 .get("requestBody")
                 .and_then(|rb| rb.get("content"))
                 .and_then(Value::as_object)
-                .map(|content| RequestBody {
-                    content: content_entries(content, &mut ctx),
-                });
+                .map(|content| RequestBody { content: content_entries(content, &mut ctx) });
 
             operations.push(Operation {
                 method,
                 path: path.clone(),
-                operation_id: op
-                    .get("operationId")
-                    .and_then(Value::as_str)
-                    .map(String::from),
+                operation_id: op.get("operationId").and_then(Value::as_str).map(String::from),
                 summary: op.get("summary").and_then(Value::as_str).map(String::from),
+                deprecated: op.get("deprecated").and_then(Value::as_bool).unwrap_or(false),
                 parameters,
                 request_body,
                 success: pick_success(op.get("responses"), &mut ctx),
@@ -400,36 +321,15 @@ fn normalize_v3(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
         }
     }
 
-    Ok((
-        ApiSpec {
-            title,
-            version,
-            base_url,
-            prefix,
-            operations,
-            schemas: ctx.schemas,
-        },
-        ctx.warnings,
-    ))
+    Ok((ApiSpec { title, version, base_url, prefix, operations, schemas: ctx.schemas }, ctx.warnings))
 }
 
 fn normalize_v2(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
     let info = root.get("info");
-    let title = info
-        .and_then(|i| i.get("title"))
-        .and_then(Value::as_str)
-        .unwrap_or("API")
-        .to_string();
-    let version = info
-        .and_then(|i| i.get("version"))
-        .and_then(Value::as_str)
-        .unwrap_or("0.0.0")
-        .to_string();
+    let title = info.and_then(|i| i.get("title")).and_then(Value::as_str).unwrap_or("API").to_string();
+    let version = info.and_then(|i| i.get("version")).and_then(Value::as_str).unwrap_or("0.0.0").to_string();
 
-    let host = root
-        .get("host")
-        .and_then(Value::as_str)
-        .unwrap_or("localhost");
+    let host = root.get("host").and_then(Value::as_str).unwrap_or("localhost");
     let scheme = root
         .get("schemes")
         .and_then(Value::as_array)
@@ -439,19 +339,11 @@ fn normalize_v2(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
     let base_path = root.get("basePath").and_then(Value::as_str).unwrap_or("");
     let base_url = Some(format!("{scheme}://{host}"));
     let trimmed = base_path.trim_end_matches('/');
-    let prefix = if trimmed.is_empty() {
-        String::new()
-    } else {
-        format!("/{trimmed}")
-    };
+    let prefix = if trimmed.is_empty() { String::new() } else { format!("/{trimmed}") };
 
     let global_produces = produces_of(root);
 
-    let mut ctx = Ctx {
-        root,
-        schemas: BTreeMap::new(),
-        warnings: Vec::new(),
-    };
+    let mut ctx = Ctx { root, schemas: BTreeMap::new(), warnings: Vec::new() };
 
     if let Some(defs) = root.get("definitions").and_then(Value::as_object) {
         for (name, v) in defs {
@@ -462,10 +354,7 @@ fn normalize_v2(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
         }
     }
 
-    let paths = root
-        .get("paths")
-        .and_then(Value::as_object)
-        .ok_or_else(|| anyhow!("spec has no `paths` object"))?;
+    let paths = root.get("paths").and_then(Value::as_object).ok_or_else(|| anyhow!("spec has no `paths` object"))?;
 
     let mut operations = Vec::new();
     for (path, item) in paths {
@@ -500,11 +389,7 @@ fn normalize_v2(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
                             }
                         }
                         Some("formData") => {
-                            let wire = p
-                                .get("name")
-                                .and_then(Value::as_str)
-                                .unwrap_or("field")
-                                .to_string();
+                            let wire = p.get("name").and_then(Value::as_str).unwrap_or("field").to_string();
                             let is_file = p.get("type").and_then(Value::as_str) == Some("file");
                             let schema = if is_file {
                                 has_file = true;
@@ -514,14 +399,8 @@ fn normalize_v2(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
                             };
                             form_fields.push(Field {
                                 wire_name: wire,
-                                type_: TypeExpr {
-                                    schema,
-                                    nullable: false,
-                                },
-                                required: p
-                                    .get("required")
-                                    .and_then(Value::as_bool)
-                                    .unwrap_or(false),
+                                type_: TypeExpr { schema, nullable: false },
+                                required: p.get("required").and_then(Value::as_bool).unwrap_or(false),
                                 description: None,
                             });
                         }
@@ -531,25 +410,11 @@ fn normalize_v2(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
             }
 
             let request_body = if let Some(s) = body_schema {
-                Some(RequestBody {
-                    content: vec![(
-                        op_consumes(op).unwrap_or_else(|| "application/json".into()),
-                        s,
-                    )],
-                })
+                Some(RequestBody { content: vec![(op_consumes(op).unwrap_or_else(|| "application/json".into()), s)] })
             } else if !form_fields.is_empty() {
-                let media = if has_file {
-                    "multipart/form-data"
-                } else {
-                    "application/x-www-form-urlencoded"
-                };
+                let media = if has_file { "multipart/form-data" } else { "application/x-www-form-urlencoded" };
                 Some(RequestBody {
-                    content: vec![(
-                        media.into(),
-                        Schema::Object(ObjectSchema {
-                            fields: form_fields,
-                        }),
-                    )],
+                    content: vec![(media.into(), Schema::Object(ObjectSchema { fields: form_fields }))],
                 })
             } else {
                 None
@@ -558,11 +423,9 @@ fn normalize_v2(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
             operations.push(Operation {
                 method,
                 path: path.clone(),
-                operation_id: op
-                    .get("operationId")
-                    .and_then(Value::as_str)
-                    .map(String::from),
+                operation_id: op.get("operationId").and_then(Value::as_str).map(String::from),
                 summary: op.get("summary").and_then(Value::as_str).map(String::from),
+                deprecated: op.get("deprecated").and_then(Value::as_bool).unwrap_or(false),
                 parameters,
                 request_body,
                 success: pick_success_v2(op.get("responses"), &global_produces, &mut ctx),
@@ -571,33 +434,15 @@ fn normalize_v2(root: &Value) -> Result<(ApiSpec, Vec<String>)> {
         }
     }
 
-    Ok((
-        ApiSpec {
-            title,
-            version,
-            base_url,
-            prefix,
-            operations,
-            schemas: ctx.schemas,
-        },
-        ctx.warnings,
-    ))
+    Ok((ApiSpec { title, version, base_url, prefix, operations, schemas: ctx.schemas }, ctx.warnings))
 }
 
 fn op_consumes(op: &Value) -> Option<String> {
-    op.get("consumes")
-        .and_then(Value::as_array)
-        .and_then(|a| a.first())
-        .and_then(Value::as_str)
-        .map(String::from)
+    op.get("consumes").and_then(Value::as_array).and_then(|a| a.first()).and_then(Value::as_str).map(String::from)
 }
 
 fn produces_of(v: &Value) -> Option<String> {
-    v.get("produces")
-        .and_then(Value::as_array)
-        .and_then(|a| a.first())
-        .and_then(Value::as_str)
-        .map(String::from)
+    v.get("produces").and_then(Value::as_array).and_then(|a| a.first()).and_then(Value::as_str).map(String::from)
 }
 
 /// View a v2 parameter as a bare schema (drop parameter metadata).
@@ -611,13 +456,7 @@ fn param_schema_view(p: &Value) -> Value {
         .filter(|(k, _)| {
             !matches!(
                 k.as_str(),
-                "name"
-                    | "in"
-                    | "description"
-                    | "required"
-                    | "collectionFormat"
-                    | "allowEmptyValue"
-                    | "uniqueItems"
+                "name" | "in" | "description" | "required" | "collectionFormat" | "allowEmptyValue" | "uniqueItems"
             )
         })
         .collect();
@@ -662,20 +501,10 @@ fn param_from_obj(p: &Value, ctx: &mut Ctx) -> Result<Parameter> {
     };
     Ok(Parameter {
         location,
-        wire_name: p
-            .get("name")
-            .and_then(Value::as_str)
-            .unwrap_or("param")
-            .to_string(),
-        required: p
-            .get("required")
-            .and_then(Value::as_bool)
-            .unwrap_or(matches!(location, Location::Path)),
+        wire_name: p.get("name").and_then(Value::as_str).unwrap_or("param").to_string(),
+        required: p.get("required").and_then(Value::as_bool).unwrap_or(matches!(location, Location::Path)),
         schema,
-        description: p
-            .get("description")
-            .and_then(Value::as_str)
-            .map(String::from),
+        description: p.get("description").and_then(Value::as_str).map(String::from),
     })
 }
 
@@ -703,14 +532,8 @@ fn pick_media_v3(resp: &Value, ctx: &mut Ctx) -> Option<SuccessResponse> {
     let keys: Vec<&String> = content.keys().collect();
     let entry = prefer_media(keys.into_iter())?;
     let mv = content.get(entry)?;
-    let schema = mv
-        .get("schema")
-        .map(|s| ctx.convert(s))
-        .unwrap_or(Schema::Any);
-    Some(SuccessResponse {
-        media_type: entry.clone(),
-        schema,
-    })
+    let schema = mv.get("schema").map(|s| ctx.convert(s)).unwrap_or(Schema::Any);
+    Some(SuccessResponse { media_type: entry.clone(), schema })
 }
 
 fn collect_errors(responses: Option<&Value>, ctx: &mut Ctx) -> Vec<Schema> {
@@ -755,10 +578,7 @@ fn pick_success_v2(
                 .map(String::from)
                 .or_else(|| global_produces.clone())
                 .unwrap_or_else(|| "application/json".into());
-            return Some(SuccessResponse {
-                media_type: mt,
-                schema: ctx.convert(schema_val),
-            });
+            return Some(SuccessResponse { media_type: mt, schema: ctx.convert(schema_val) });
         }
     }
     None
@@ -808,10 +628,7 @@ fn split_server_url(url: &str) -> (Option<String>, String) {
         Some((_, rest)) => match rest.find('/') {
             Some(idx) => {
                 let path = &rest[idx..];
-                (
-                    Some(url[..url.len() - path.len()].to_string()),
-                    path.trim_end_matches('/').to_string(),
-                )
+                (Some(url[..url.len() - path.len()].to_string()), path.trim_end_matches('/').to_string())
             }
             None => (Some(url.trim_end_matches('/').to_string()), String::new()),
         },
@@ -819,5 +636,123 @@ fn split_server_url(url: &str) -> (Option<String>, String) {
             // Relative server URL: only a path.
             (None, url.trim_end_matches('/').to_string())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── split_server_url ────────────────────────────────────────────────
+
+    #[test]
+    fn split_url_full() {
+        assert_eq!(
+            split_server_url("https://api.example.com/v1"),
+            (Some("https://api.example.com".to_string()), "/v1".to_string())
+        );
+    }
+
+    #[test]
+    fn split_url_no_path() {
+        assert_eq!(
+            split_server_url("https://api.example.com"),
+            (Some("https://api.example.com".to_string()), String::new())
+        );
+    }
+
+    #[test]
+    fn split_url_relative() {
+        assert_eq!(split_server_url("/api/v1"), (None, "/api/v1".to_string()));
+    }
+
+    #[test]
+    fn split_url_trailing_slash() {
+        assert_eq!(
+            split_server_url("https://example.com/api/v1/"),
+            (Some("https://example.com".to_string()), "/api/v1".to_string())
+        );
+    }
+
+    #[test]
+    fn split_url_root() {
+        assert_eq!(split_server_url("/"), (None, String::new()));
+    }
+
+    // ── prefer_media ────────────────────────────────────────────────────
+
+    #[test]
+    fn prefer_json() {
+        let keys = vec!["application/json".to_string(), "text/plain".to_string()];
+        assert_eq!(prefer_media(keys.iter()).unwrap(), "application/json");
+    }
+
+    #[test]
+    fn prefer_text_if_no_json() {
+        let keys = vec!["text/plain".to_string(), "application/octet-stream".to_string()];
+        assert_eq!(prefer_media(keys.iter()).unwrap(), "text/plain");
+    }
+
+    #[test]
+    fn prefer_plus_json() {
+        let keys = vec!["application/vnd.api+json".to_string()];
+        assert_eq!(prefer_media(keys.iter()).unwrap(), "application/vnd.api+json");
+    }
+
+    #[test]
+    fn prefer_first_when_no_known() {
+        // Neither "application/xml" nor "application/csv" matches any known pattern
+        let keys = vec!["application/xml".to_string(), "application/csv".to_string()];
+        assert_eq!(prefer_media(keys.iter()).unwrap(), "application/xml");
+    }
+
+    #[test]
+    fn prefer_empty() {
+        let keys: Vec<String> = vec![];
+        assert!(prefer_media(keys.iter()).is_none());
+    }
+
+    // ── enum_strings ────────────────────────────────────────────────────
+
+    #[test]
+    fn extract_enum_strings() {
+        let v = serde_json::json!({"enum": ["a", "b", "c"]});
+        assert_eq!(enum_strings(&v), Some(vec!["a".to_string(), "b".to_string(), "c".to_string()]));
+    }
+
+    #[test]
+    fn extract_enum_empty() {
+        let v = serde_json::json!({"enum": []});
+        assert_eq!(enum_strings(&v), None);
+    }
+
+    #[test]
+    fn extract_enum_no_field() {
+        let v = serde_json::json!({"type": "string"});
+        assert_eq!(enum_strings(&v), None);
+    }
+
+    // ── parse_reader ────────────────────────────────────────────────────
+
+    #[test]
+    fn parse_json_spec() {
+        let json = r#"{"openapi": "3.0.0", "info": {"title": "Test", "version": "1.0"}, "paths": {}}"#;
+        let result = parse_reader(std::io::Cursor::new(json));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn parse_yaml_spec() {
+        let yaml = "openapi: 3.0.0\ninfo:\n  title: Test\n  version: '1.0'\npaths: {}\n";
+        let result = parse_reader(std::io::Cursor::new(yaml));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn parse_invalid_spec() {
+        // "\x00" is neither valid JSON nor valid YAML
+        let bad = "\0";
+        let result = parse_reader(std::io::Cursor::new(bad));
+        assert!(result.is_err());
     }
 }

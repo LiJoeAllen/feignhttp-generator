@@ -12,9 +12,7 @@ use std::sync::Arc;
 use consumer_test::models::{
     ApiResponse, Category, Order, OrderStatus, Pet, PetFindByStatusQuery, PetStatus, Tag, User,
 };
-use consumer_test::{
-    index::Index, pet::Pet as PetApi, store::Store, user::User as UserApi, ApiContext,
-};
+use consumer_test::{index::Index, pet::Pet as PetApi, store::Store, user::User as UserApi, ApiContext};
 use feignhttp::FeignClientBuilder;
 
 /// What the stub server captured from one request.
@@ -30,10 +28,7 @@ struct Captured {
 
 impl Captured {
     fn header(&self, name: &str) -> Option<&str> {
-        self.headers
-            .iter()
-            .find(|(n, _)| n.eq_ignore_ascii_case(name))
-            .map(|(_, v)| v.as_str())
+        self.headers.iter().find(|(n, _)| n.eq_ignore_ascii_case(name)).map(|(_, v)| v.as_str())
     }
 }
 
@@ -134,11 +129,7 @@ fn client_ctx(base_url: &str) -> ApiContext {
 }
 
 fn json_response(status: u16, value: serde_json::Value) -> (u16, String, Vec<u8>) {
-    (
-        status,
-        "application/json".to_string(),
-        serde_json::to_vec(&value).expect("serialize json"),
-    )
+    (status, "application/json".to_string(), serde_json::to_vec(&value).expect("serialize json"))
 }
 
 fn empty_response(status: u16) -> (u16, String, Vec<u8>) {
@@ -163,19 +154,13 @@ async fn get_pet_decodes_nested_models_and_enum() {
         assert_eq!(req.path, "/pet/42", "path param substitution");
         json_response(200, sample_pet_json(42))
     }));
-    let client = Index::builder()
-        .context(client_ctx(&base))
-        .build()
-        .expect("build Index");
+    let client = Index::builder().context(client_ctx(&base)).build().expect("build Index");
     let pet = client.get_pet(42).await.expect("get_pet");
     assert_eq!(pet.id, Some(42));
     assert_eq!(pet.name, "Rex");
     let category = pet.category.expect("category");
     assert_eq!(category.name.as_deref(), Some("Dogs"));
-    assert_eq!(
-        pet.photo_urls,
-        vec!["https://example.com/rex.png".to_string()]
-    );
+    assert_eq!(pet.photo_urls, vec!["https://example.com/rex.png".to_string()]);
     assert!(matches!(pet.status, Some(PetStatus::Available)));
 }
 
@@ -185,16 +170,12 @@ async fn post_pet_serializes_body_with_renames() {
         assert_eq!(req.method, "POST");
         assert_eq!(req.path, "/pet");
         assert!(req.content_type.starts_with("application/json"));
-        let v: serde_json::Value =
-            serde_json::from_slice(&req.body).expect("request body must be valid JSON");
+        let v: serde_json::Value = serde_json::from_slice(&req.body).expect("request body must be valid JSON");
         assert_eq!(v["name"], "Rex");
         assert_eq!(v["photoUrls"], serde_json::json!(["a.png"]));
         json_response(200, sample_pet_json(7))
     }));
-    let client = Index::builder()
-        .context(client_ctx(&base))
-        .build()
-        .expect("build Index");
+    let client = Index::builder().context(client_ctx(&base)).build().expect("build Index");
     let pet = Pet {
         category: None,
         id: None,
@@ -224,15 +205,9 @@ async fn put_pet_roundtrip() {
             }),
         )
     }));
-    let client = Index::builder()
-        .context(client_ctx(&base))
-        .build()
-        .expect("build Index");
+    let client = Index::builder().context(client_ctx(&base)).build().expect("build Index");
     let pet = Pet {
-        category: Some(Category {
-            id: Some(1),
-            name: Some("Dogs".to_string()),
-        }),
+        category: Some(Category { id: Some(1), name: Some("Dogs".to_string()) }),
         id: Some(42),
         name: "Rex".to_string(),
         photo_urls: vec![],
@@ -248,21 +223,11 @@ async fn delete_pet_sends_header_and_returns_unit() {
     let base = spawn_server(Arc::new(|req| {
         assert_eq!(req.method, "DELETE");
         assert_eq!(req.path, "/pet/42");
-        assert_eq!(
-            req.header("api_key"),
-            Some("secret-key"),
-            "header param missing"
-        );
+        assert_eq!(req.header("api_key"), Some("secret-key"), "header param missing");
         empty_response(200)
     }));
-    let client = Index::builder()
-        .context(client_ctx(&base))
-        .build()
-        .expect("build Index");
-    client
-        .delete_pet(42, "secret-key".to_string())
-        .await
-        .expect("delete_pet");
+    let client = Index::builder().context(client_ctx(&base)).build().expect("build Index");
+    client.delete_pet(42, "secret-key".to_string()).await.expect("delete_pet");
 }
 
 #[tokio::test]
@@ -270,24 +235,11 @@ async fn find_by_status_sends_enum_query_and_decodes_vec() {
     let base = spawn_server(Arc::new(|req| {
         assert_eq!(req.method, "GET");
         assert_eq!(req.path, "/pet/findByStatus");
-        assert!(
-            req.query.contains("status=available"),
-            "enum query not serialized correctly: {}",
-            req.query
-        );
-        json_response(
-            200,
-            serde_json::json!([sample_pet_json(1), sample_pet_json(2)]),
-        )
+        assert!(req.query.contains("status=available"), "enum query not serialized correctly: {}", req.query);
+        json_response(200, serde_json::json!([sample_pet_json(1), sample_pet_json(2)]))
     }));
-    let client = PetApi::builder()
-        .context(client_ctx(&base))
-        .build()
-        .expect("build Pet");
-    let pets = client
-        .find_by_status(PetFindByStatusQuery::Available)
-        .await
-        .expect("find_by_status");
+    let client = PetApi::builder().context(client_ctx(&base)).build().expect("build Pet");
+    let pets = client.find_by_status(PetFindByStatusQuery::Available).await.expect("find_by_status");
     assert_eq!(pets.len(), 2);
     assert_eq!(pets[1].id, Some(2));
 }
@@ -302,14 +254,8 @@ async fn find_by_tags_sends_repeated_array_query() {
         );
         json_response(200, serde_json::json!([]))
     }));
-    let client = PetApi::builder()
-        .context(client_ctx(&base))
-        .build()
-        .expect("build Pet");
-    let pets = client
-        .find_by_tags(vec!["alpha".to_string(), "beta".to_string()])
-        .await
-        .expect("find_by_tags");
+    let client = PetApi::builder().context(client_ctx(&base)).build().expect("build Pet");
+    let pets = client.find_by_tags(vec!["alpha".to_string(), "beta".to_string()]).await.expect("find_by_tags");
     assert!(pets.is_empty());
 }
 
@@ -320,30 +266,13 @@ async fn upload_image_sends_octet_stream_and_decodes_apiresponse() {
     let base = spawn_server(Arc::new(move |req| {
         assert_eq!(req.method, "POST");
         assert_eq!(req.path, "/pet/42/uploadImage");
-        assert!(
-            req.query.contains("additionalMetadata=meta"),
-            "query param missing: {}",
-            req.query
-        );
-        assert!(
-            req.content_type.starts_with("application/octet-stream"),
-            "ct={}",
-            req.content_type
-        );
+        assert!(req.query.contains("additionalMetadata=meta"), "query param missing: {}", req.query);
+        assert!(req.content_type.starts_with("application/octet-stream"), "ct={}", req.content_type);
         assert_eq!(req.body, expected, "binary body lost");
-        json_response(
-            200,
-            serde_json::json!({"code": 200, "type": "ok", "message": "uploaded"}),
-        )
+        json_response(200, serde_json::json!({"code": 200, "type": "ok", "message": "uploaded"}))
     }));
-    let client = Index::builder()
-        .context(client_ctx(&base))
-        .build()
-        .expect("build Index");
-    let resp = client
-        .post_pet_3(42, "meta".to_string(), payload)
-        .await
-        .expect("upload image");
+    let client = Index::builder().context(client_ctx(&base)).build().expect("build Index");
+    let resp = client.post_pet_3(42, "meta".to_string(), payload).await.expect("upload image");
     assert_eq!(resp.code, Some(200));
     assert_eq!(resp.r#type.as_deref(), Some("ok"));
     assert_eq!(resp.message.as_deref(), Some("uploaded"));
@@ -358,14 +287,8 @@ async fn user_login_sends_query_and_decodes_text() {
         assert!(req.query.contains("password=p1"), "query={}", req.query);
         (200, "text/plain".to_string(), b"tok-9".to_vec())
     }));
-    let client = UserApi::builder()
-        .context(client_ctx(&base))
-        .build()
-        .expect("build User");
-    let token = client
-        .login("u1".to_string(), "p1".to_string())
-        .await
-        .expect("login");
+    let client = UserApi::builder().context(client_ctx(&base)).build().expect("build User");
+    let token = client.login("u1".to_string(), "p1".to_string()).await.expect("login");
     assert_eq!(token, "tok-9");
 }
 
@@ -382,10 +305,7 @@ async fn create_with_list_posts_json_array_body() {
             serde_json::json!({"id": 9, "username": "ada", "firstName": "Ada", "lastName": "L", "email": null, "password": null, "phone": null, "userStatus": 1}),
         )
     }));
-    let client = UserApi::builder()
-        .context(client_ctx(&base))
-        .build()
-        .expect("build User");
+    let client = UserApi::builder().context(client_ctx(&base)).build().expect("build User");
     let users = vec![User {
         email: None,
         first_name: Some("Ada".to_string()),
@@ -396,10 +316,7 @@ async fn create_with_list_posts_json_array_body() {
         user_status: Some(1),
         username: None,
     }];
-    let created = client
-        .create_with_list(users)
-        .await
-        .expect("createWithList");
+    let created = client.create_with_list(users).await.expect("createWithList");
     assert_eq!(created.id, Some(9));
 }
 
@@ -412,10 +329,7 @@ async fn get_user_decodes_renamed_fields() {
             serde_json::json!({"id": 5, "username": "u1", "firstName": "F", "lastName": "L", "email": "e@x", "password": "p", "phone": "+1", "userStatus": 2}),
         )
     }));
-    let client = Index::builder()
-        .context(client_ctx(&base))
-        .build()
-        .expect("build Index");
+    let client = Index::builder().context(client_ctx(&base)).build().expect("build Index");
     let user = client.get_user("u1".to_string()).await.expect("get_user");
     assert_eq!(user.first_name.as_deref(), Some("F"));
     assert_eq!(user.user_status, Some(2));
@@ -435,10 +349,7 @@ async fn store_order_enum_body_field_roundtrip() {
             serde_json::json!({"id": 3, "petId": 42, "quantity": 1, "shipDate": "2026-08-26T00:00:00Z", "status": "placed", "complete": false}),
         )
     }));
-    let client = Store::builder()
-        .context(client_ctx(&base))
-        .build()
-        .expect("build Store");
+    let client = Store::builder().context(client_ctx(&base)).build().expect("build Store");
     let order = Order {
         complete: Some(false),
         id: Some(3),
@@ -455,19 +366,10 @@ async fn store_order_enum_body_field_roundtrip() {
 #[tokio::test]
 async fn error_response_parses_into_typed_payload() {
     let base = spawn_server(Arc::new(|_req| {
-        json_response(
-            404,
-            serde_json::json!({"code": 404, "type": "error", "message": "Pet not found"}),
-        )
+        json_response(404, serde_json::json!({"code": 404, "type": "error", "message": "Pet not found"}))
     }));
-    let client = Index::builder()
-        .context(client_ctx(&base))
-        .build()
-        .expect("build Index");
-    let err = client
-        .get_pet(999_999)
-        .await
-        .expect_err("expected status error");
+    let client = Index::builder().context(client_ctx(&base)).build().expect("build Index");
+    let err = client.get_pet(999_999).await.expect_err("expected status error");
     let kind = err.error_kind();
     let feignhttp::ErrorKind::Status(status, body) = kind else {
         panic!("expected ErrorKind::Status");

@@ -1,0 +1,7 @@
+# Allowlist of clippy lints that are OK for generated code / build scripts.
+allow = [
+    "too_many_arguments",       # generated API methods may have many params
+    "type_complexity",           # generated types can be deeply nested
+    "module_name_repetitions",   # generated module names may repeat crate names
+    "doc_markdown",              # OpenAPI spec terms may not be valid Rust doc identifiers
+]

@@ -56,6 +56,7 @@ pub struct Operation {
     pub path: String,
     pub operation_id: Option<String>,
     pub summary: Option<String>,
+    pub deprecated: bool,
     pub parameters: Vec<Parameter>,
     pub request_body: Option<RequestBody>,
     /// Preferred 2xx response (media type + schema), if any.

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 use crate::ir::{ObjectSchema, Schema, StrSchema, TypeExpr};
-use crate::naming::{sanitize_ident, sanitize_type_name};
+use crate::naming::{escape, sanitize_ident, sanitize_type_name};
 
 /// Rendered model items plus bookkeeping for synthesized names.
 pub struct ModelRegistry {
@@ -24,12 +24,7 @@ impl Default for ModelRegistry {
 
 impl ModelRegistry {
     pub fn new() -> Self {
-        Self {
-            idents: BTreeMap::new(),
-            items: BTreeMap::new(),
-            counters: BTreeMap::new(),
-            serde_json_value: false,
-        }
+        Self { idents: BTreeMap::new(), items: BTreeMap::new(), counters: BTreeMap::new(), serde_json_value: false }
     }
 
     pub fn rendered(&self) -> impl Iterator<Item = &String> {
@@ -43,11 +38,7 @@ impl ModelRegistry {
         let base = sanitize_type_name(raw);
         let n = self.counters.entry(base.clone()).or_insert(0);
         *n += 1;
-        let id = if *n == 1 {
-            base
-        } else {
-            format!("{base}_{}", n)
-        };
+        let id = if *n == 1 { base } else { format!("{base}_{}", n) };
         self.idents.insert(raw.to_string(), id.clone());
         id
     }
@@ -134,21 +125,12 @@ impl ModelRegistry {
                 let src = self.render_struct(&id, obj);
                 self.put(&id, src);
             }
-            Schema::Str(StrSchema {
-                enum_values: Some(vals),
-                ..
-            }) => {
+            Schema::Str(StrSchema { enum_values: Some(vals), .. }) => {
                 let src = render_enum(&id, vals);
                 self.put(&id, src);
             }
             other => {
-                let ty = self.rust_type(
-                    &TypeExpr {
-                        schema: clone_schema(other),
-                        nullable: false,
-                    },
-                    raw,
-                );
+                let ty = self.rust_type(&TypeExpr { schema: clone_schema(other), nullable: false }, raw);
                 self.put(&id, format!("pub type {id} = {ty};\n"));
             }
         }
@@ -168,10 +150,7 @@ impl ModelRegistry {
 
     fn render_struct(&mut self, id: &str, obj: &ObjectSchema) -> String {
         let mut out = String::new();
-        let _ = writeln!(
-            out,
-            "#[derive(Clone, Debug, ::serde::Deserialize, ::serde::Serialize)]"
-        );
+        let _ = writeln!(out, "#[derive(Clone, Debug, ::serde::Deserialize, ::serde::Serialize)]");
         let _ = writeln!(out, "pub struct {id} {{");
         if obj.fields.is_empty() {
             let _ = writeln!(out, "}}");
@@ -189,11 +168,7 @@ impl ModelRegistry {
             // serde treats missing `Option<T>` fields as `None` natively, so no
             // `#[serde(default)]` is emitted; wrap only when not already optional.
             let optional = !f.required || f.type_.nullable;
-            let ty = if optional && !ty.starts_with("Option<") {
-                format!("Option<{ty}>")
-            } else {
-                ty
-            };
+            let ty = if optional && !ty.starts_with("Option<") { format!("Option<{ty}>") } else { ty };
             if field_ident != f.wire_name {
                 let _ = writeln!(out, "    #[serde(rename = \"{}\")]", escape(&f.wire_name));
             }
@@ -206,20 +181,14 @@ impl ModelRegistry {
 
 fn render_enum(id: &str, values: &[String]) -> String {
     let mut out = String::new();
-    let _ = writeln!(
-        out,
-        "#[derive(Clone, Debug, ::serde::Deserialize, ::serde::Serialize, PartialEq, Eq)]"
-    );
+    let _ = writeln!(out, "#[derive(Clone, Debug, ::serde::Deserialize, ::serde::Serialize, PartialEq, Eq)]");
+    let _ = writeln!(out, "#[non_exhaustive]");
     let _ = writeln!(out, "pub enum {id} {{");
     let mut display_arms = Vec::new();
     for v in values {
         let variant = sanitize_type_name(v);
         display_arms.push((variant.clone(), v.clone()));
-        let _ = writeln!(
-            out,
-            "    #[serde(rename = \"{}\")]\n    {variant},",
-            escape(v)
-        );
+        let _ = writeln!(out, "    #[serde(rename = \"{}\")]\n    {variant},", escape(v));
     }
     let _ = writeln!(out, "}}");
     // feignhttp serializes scalar params with `.to_string()`; give variants
@@ -229,11 +198,7 @@ fn render_enum(id: &str, values: &[String]) -> String {
         "impl ::std::fmt::Display for {id} {{\n    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {{\n        match self {{"
     );
     for (variant, wire) in &display_arms {
-        let _ = writeln!(
-            out,
-            "            {id}::{variant} => f.write_str(\"{}\"),",
-            escape(wire)
-        );
+        let _ = writeln!(out, "            {id}::{variant} => f.write_str(\"{}\"),", escape(wire));
     }
     let _ = writeln!(out, "        }}\n    }}\n}}");
     out
@@ -241,10 +206,6 @@ fn render_enum(id: &str, values: &[String]) -> String {
 
 fn clone_schema(s: &Schema) -> Schema {
     s.clone()
-}
-
-fn escape(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 fn snake_to_camel(s: &str) -> String {
