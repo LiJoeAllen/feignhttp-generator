@@ -1,6 +1,6 @@
 [package]
 name = "feignhttp-generator"
-version = "0.1.0-26.8.26"
+version = "0.1.0+1"
 edition = "2021"
 description = "OpenAPI to feignhttp client code generator"
 license = "MIT"
